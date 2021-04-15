@@ -8,7 +8,7 @@ endif()
 add_compile_options(-std=c++14)
 
 # Modify cmake module path if new .cmake files are required
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
+LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -19,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   eigen_conversions
   tf_conversions
-  random_numbers
+  # random_numbers
   message_generation
   nodelet
   image_transport
@@ -109,6 +109,7 @@ target_link_libraries(msckf_vio_nodelet
 # Image processor
 add_library(image_processor
   src/image_processor.cpp
+  src/random_numbers.cpp
   src/utils.cpp
 )
 add_dependencies(image_processor
