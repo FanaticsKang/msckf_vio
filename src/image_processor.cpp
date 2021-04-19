@@ -342,9 +342,11 @@ void ImageProcessor::initializeFirstFrame() {
 
   // Group the features into grids
   GridFeatures grid_new_features;
-  for (int code = 0; code <
-      processor_config.grid_row*processor_config.grid_col; ++code)
-      grid_new_features[code] = vector<FeatureMetaData>(0);
+  // Number of Grids, image is splited into several grids(default: 4*4, EuRoc: 4*5)
+  const int kAllGridNum = processor_config.grid_row * processor_config.grid_col;
+  for (int code = 0; code < kAllGridNum; ++code) {
+    grid_new_features[code] = vector<FeatureMetaData>(0);
+  }
 
   for (int i = 0; i < cam0_inliers.size(); ++i) {
     const cv::Point2f& cam0_point = cam0_inliers[i];
@@ -363,18 +365,21 @@ void ImageProcessor::initializeFirstFrame() {
   }
 
   // Sort the new features in each grid based on its response.
-  for (auto& item : grid_new_features)
+  for (auto& item : grid_new_features){
     std::sort(item.second.begin(), item.second.end(),
         &ImageProcessor::featureCompareByResponse);
+  }
 
   // Collect new features within each grid with high response.
-  for (int code = 0; code <
-      processor_config.grid_row*processor_config.grid_col; ++code) {
+  // AllGridNum may be 20(4x5), grid_min may 3. The features_this_grid may have 60 elements.
+  std::cout << "next feature id pre: " <<  next_feature_id << std::endl;
+  for (int code = 0; code < kAllGridNum; ++code) {
     vector<FeatureMetaData>& features_this_grid = (*curr_features_ptr)[code];
     vector<FeatureMetaData>& new_features_this_grid = grid_new_features[code];
 
     for (int k = 0; k < processor_config.grid_min_feature_num &&
-        k < new_features_this_grid.size(); ++k) {
+                    k < new_features_this_grid.size();
+         ++k) {
       features_this_grid.push_back(new_features_this_grid[k]);
       features_this_grid.back().id = next_feature_id++;
       features_this_grid.back().lifetime = 1;
@@ -402,6 +407,8 @@ void ImageProcessor::predictFeatureTracking(
       intrinsics[0], 0.0, intrinsics[2],
       0.0, intrinsics[1], intrinsics[3],
       0.0, 0.0, 1.0);
+  // Like Homography Matrix but ignore translate.
+  // 像是单应矩阵，但是忽略了平移。
   cv::Matx33f H = K * R_p_c * K.inv();
 
   for (int i = 0; i < input_pts.size(); ++i) {
@@ -926,6 +933,23 @@ void ImageProcessor::integrateImuData(
       break;
   }
 
+  /*
+  auto test_lower = std::lower_bound(
+      imu_msg_buffer.begin(), imu_msg_buffer.end(),
+      cam0_prev_img_ptr->header.stamp,
+      [](const sensor_msgs::Imu& imu, const ros::Time& image_time) {
+        return (imu.header.stamp - image_time).toSec() < -0.01;
+      });
+
+  if (test_lower == imu_msg_buffer.end()) {
+    ROS_WARN_STREAM("End");
+  } else {
+    ROS_WARN_STREAM(
+        "delta: "
+        << (begin_iter->header.stamp - test_lower->header.stamp).toSec());
+  }
+  */
+
   auto end_iter = begin_iter;
   while (end_iter != imu_msg_buffer.end()) {
     if ((end_iter->header.stamp-
@@ -937,9 +961,10 @@ void ImageProcessor::integrateImuData(
 
   // Compute the mean angular velocity in the IMU frame.
   Vec3f mean_ang_vel(0.0, 0.0, 0.0);
-  for (auto iter = begin_iter; iter < end_iter; ++iter)
+  for (auto iter = begin_iter; iter != end_iter; ++iter){
     mean_ang_vel += Vec3f(iter->angular_velocity.x,
         iter->angular_velocity.y, iter->angular_velocity.z);
+  } 
 
   if (end_iter-begin_iter > 0)
     mean_ang_vel *= 1.0f / (end_iter-begin_iter);
