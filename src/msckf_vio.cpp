@@ -578,10 +578,14 @@ void MsckfVio::processModel(const double& time,
   predictNewState(dtime, gyro, acc);
 
   // Modify the transition matrix
+  // orientation_null 是前一时刻的gyro, from k to k-1的旋转
+  // 这里要使用R_{k|k-1}, 进行OC修正，参考Observability-constrained Vision-aided
+  // Inertial Navigation
   Matrix3d R_kk_1 = quaternionToRotation(imu_state.orientation_null);
   Phi.block<3, 3>(0, 0) =
-    quaternionToRotation(imu_state.orientation) * R_kk_1.transpose();
+      quaternionToRotation(imu_state.orientation) * R_kk_1.transpose();
 
+  // 重力在当前坐标系下的投影
   Vector3d u = R_kk_1 * IMUState::gravity;
   RowVector3d s = (u.transpose()*u).inverse() * u.transpose();
 
@@ -726,7 +730,7 @@ void MsckfVio::stateAugmentation(const double& time) {
   J.block<3, 3>(3, 0) = skewSymmetric(R_w_i.transpose()*t_c_i);
   //J.block<3, 3>(3, 0) = -R_w_i.transpose()*skewSymmetric(t_c_i);
   J.block<3, 3>(3, 12) = Matrix3d::Identity();
-  J.block<3, 3>(3, 18) = Matrix3d::Identity();
+  J.block<3, 3>(3, 18) = R_w_i.transpose();
 
   // Resize the state covariance matrix.
   size_t old_rows = state_server.state_cov.rows();
